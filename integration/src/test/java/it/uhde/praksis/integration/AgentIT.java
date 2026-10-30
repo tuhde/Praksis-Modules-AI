@@ -199,6 +199,15 @@ class AgentIT {
       setUp(h, models);
       Process daemon = h.startDaemon();
 
+      // the window asks which rules the agent can write tests for
+      var untested = h.ask(new it.uhde.praksis.protocol.Request.Untested());
+      assertThat(untested)
+          .isEqualTo(
+              new it.uhde.praksis.protocol.Response.UntestedRules(
+                  java.util.List.of(
+                      new it.uhde.praksis.protocol.Response.UntestedRules.Rule(
+                          "mail.50-demo", "mine", "local-write"))));
+
       Harness.CliResult done = h.cli("run", "agent.write-tests", "rule=mail.50-demo");
 
       assertThat(done.exit()).as(done.output()).isZero();
