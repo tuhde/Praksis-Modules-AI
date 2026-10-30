@@ -47,6 +47,7 @@
             <praksis.modules>${project.basedir}/..</praksis.modules>
             <!-- the ruleset that these tests run with the module, as it is published -->
             <praksis.mail.ruleset>${project.basedir}/../../Praksis-Mail</praksis.mail.ruleset>
+            <praksis.agent.ruleset>${project.basedir}/../../Praksis-Agent</praksis.agent.ruleset>
           </systemPropertyVariables>
         </configuration>
       </plugin>
