@@ -160,7 +160,9 @@ model = "/home/me/.local/share/vosk-dictation/models/vosk-model-small-de-0.15"
 language = "de"
 ```
 
-A grant can limit the profile (`profile = { one_of = ["en"] }`). The commands are started with
+A grant can limit the profile (`profile = { one_of = ["en"] }`); a rule has to name the profile then.
+
+**Push to talk:** a view can give a text input a microphone button (`dictate = { capability = "speech.listen", args = { seconds = 8 } }` on the `input`): the person presses it, says a sentence, and the text is written into the input. The grant is the view owner's, every press is in the audit log, and a grant that limits the profile does not cover a button that names none. Praksis-Mail's reader has it on its search box. The commands are started with
 arguments and never through a shell, the model path comes only from the settings, and a call that
 names a file by anything but the token of an upload is refused. The small models make mistakes
 (a test with a synthetic voice heard "my meal and bread tomorrow" for "buy milk and bread
