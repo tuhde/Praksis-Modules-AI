@@ -224,6 +224,23 @@ class AgentIT {
           .contains("0 error(s)");
       assertThat(notes(h)).contains("is staged as " + id);
 
+      // the window asks the daemon for the same things as the command line
+      var list =
+          (it.uhde.praksis.protocol.Response.StagedList)
+              h.ask(new it.uhde.praksis.protocol.Request.Staged());
+      assertThat(list.items()).hasSize(1);
+      assertThat(list.items().get(0).id()).isEqualTo(id);
+      assertThat(list.items().get(0).layer()).isEqualTo("mine");
+      assertThat(list.items().get(0).files()).containsExactly("tests/mail.50-demo.toml");
+      var detail =
+          (it.uhde.praksis.protocol.Response.StagedDetail)
+              h.ask(new it.uhde.praksis.protocol.Request.StagedShow(id));
+      assertThat(detail.files()).containsOnlyKeys("tests/mail.50-demo.toml");
+      assertThat(detail.files().get("tests/mail.50-demo.toml")).startsWith("format_version = 1");
+      assertThat(detail.verification().errors()).isZero();
+      assertThat(h.ask(new it.uhde.praksis.protocol.Request.StagedShow("nope")))
+          .isInstanceOf(it.uhde.praksis.protocol.Response.Error.class);
+
       // the person takes it into their own checkout, and only there
       Path checkout = Files.createDirectories(h.home.resolve("checkout"));
       Harness.CliResult exported = h.cli("agent", "export", id, checkout.toString());
@@ -232,8 +249,11 @@ class AgentIT {
           .startsWith("format_version = 1");
       assertThat(h.cli("agent", "export", id, checkout.toString()).exit())
           .isEqualTo(1); // not over a file
-      assertThat(h.cli("agent", "drop", id).exit()).isZero();
+      assertThat(h.ask(new it.uhde.praksis.protocol.Request.StagedDrop(id)))
+          .isEqualTo(new it.uhde.praksis.protocol.Response.Done("Dropped " + id + "."));
       assertThat(h.cli("agent", "list").output()).contains("Nothing is staged");
+      assertThat(h.home.resolve("mine/tests"))
+          .doesNotExist(); // nothing of it was ever in the layer
       h.stop(daemon);
     }
   }
