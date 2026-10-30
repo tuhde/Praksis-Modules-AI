@@ -1,7 +1,8 @@
 # Praksis-Modules-AI
 
-Model access for [Praksis](https://github.com/tuhde/Praksis): a module `ai` that lets rules and
-commands ask a language model, with the limits that make that safe to do with a person's mail.
+Two modules for [Praksis](https://github.com/tuhde/Praksis): `ai` lets rules and commands ask a
+language model, with the limits that make that safe to do with a person's mail, and `speech` turns
+speech into text with a Vosk on this machine (see the end).
 
 | Capability | What it does |
 |---|---|
@@ -121,6 +122,49 @@ command `mail.ai-evaluate` that tries a model on your own examples.
 - **Redirects are not followed**, so a key goes only to the address that you wrote down.
 - **No secrets in prompts:** the key is used for the connection only and is never part of what is
   sent. What a person writes into a prompt, or a mail contains, is not scanned.
+
+## The module `speech`: speech to text, on this machine
+
+| Capability | What it does |
+|---|---|
+| `speech.listen(seconds, profile)` | listens on the microphone until one sentence has been said, or the seconds are over, and gives the text |
+| `speech.transcribe(file, profile)` | the text of an audio file that a person chose (`file` is the token of an upload, never a path; any format that ffmpeg reads) |
+
+Both give `text`, `heard` (false if nothing was said), `profile`, `language` and `seconds`. They only
+read, so their effect class is `read-only`, but a grant is needed like for everything, and a rule
+that listens should be one that a person starts (a command). **Nothing is recorded to a file and
+nothing leaves the machine.** What was said is text from outside, like a mail: a rule must not do
+something important only because of it (a good pattern: `ai.classify` the text into the commands you
+allow, and branch on the label).
+
+It uses the Vosk that you set up yourself: a Python with the package `vosk`, and a model directory
+per language. Nothing is installed by the module. With the setup in
+`~/.local/share/vosk-dictation` (a venv and models):
+
+```toml
+enabled_modules = ["maildir", "speech"]
+
+[module.speech]
+python = ["/home/me/.local/share/vosk-dictation/venv/bin/python"]
+default = "en"
+# record_command = ["parec", "--format=s16le", "--rate=16000", "--channels=1"]   # the default: PulseAudio
+# convert_command = ["ffmpeg", "-nostdin", "-v", "error", "-i", "{file}", "-f", "s16le", "-ar", "16000", "-ac", "1", "-"]
+# max_seconds = 30
+
+[module.speech.en]
+model = "/home/me/.local/share/vosk-dictation/models/vosk-model-small-en-us-0.15"
+language = "en"
+
+[module.speech.de]
+model = "/home/me/.local/share/vosk-dictation/models/vosk-model-small-de-0.15"
+language = "de"
+```
+
+A grant can limit the profile (`profile = { one_of = ["en"] }`). The commands are started with
+arguments and never through a shell, the model path comes only from the settings, and a call that
+names a file by anything but the token of an upload is refused. The small models make mistakes
+(a test with a synthetic voice heard "my meal and bread tomorrow" for "buy milk and bread
+tomorrow"): fine for commands and notes, not for anything that must be exact.
 
 ## License
 

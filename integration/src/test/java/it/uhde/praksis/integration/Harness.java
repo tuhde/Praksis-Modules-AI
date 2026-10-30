@@ -52,7 +52,7 @@ final class Harness implements AutoCloseable {
     // modules and the expression layer come from the image; the lockfile is made by the CLI
     assertThat(cli("modules", "lock").exit()).isZero();
     // the module is not in the image: they come from their archives, as for a person
-    for (String module : List.of("ai")) {
+    for (String module : List.of("ai", "speech")) {
       CliResult installed = cli("modules", "install", archive(module).toString());
       assertThat(installed.exit()).as(installed.output()).isZero();
     }

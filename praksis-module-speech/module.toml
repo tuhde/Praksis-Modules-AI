@@ -1,0 +1,46 @@
+format_version = 1
+api_version = 1
+name = "speech"
+version = "0.1.0"
+module = "it.uhde.praksis.module.speech"
+jdk_modules = ["com.fasterxml.jackson.databind"]
+
+# Speech to text, on this machine: the module starts a Python with the vosk package (set up by the
+# person, see the README) and gives it audio. Nothing is sent anywhere and no audio is kept. The
+# text is what a person said or a file holds, so for a rule it is data from outside, like a mail.
+
+# Listens on the microphone until a sentence has been said (or the seconds are over). A person has
+# to ask for it: it is a command or a rule step, and it needs a grant, like every capability.
+[[capability]]
+name = "speech.listen"
+effect = "read-only"
+dry_run = true
+params = [
+  { name = "seconds", type = "int", required = false, scopable = false },
+  { name = "profile", type = "string", required = false, scopable = true },
+]
+results = [
+  { name = "text", type = "string", required = true },
+  { name = "heard", type = "bool", required = true },
+  { name = "profile", type = "string", required = true },
+  { name = "language", type = "string", required = true },
+  { name = "seconds", type = "double", required = true },
+]
+
+# Turns an audio file that a person chose (a form with a file widget gives a token, not a path) into
+# text. Any format that ffmpeg reads.
+[[capability]]
+name = "speech.transcribe"
+effect = "read-only"
+dry_run = true
+params = [
+  { name = "file", type = "string", required = true, scopable = false },
+  { name = "profile", type = "string", required = false, scopable = true },
+]
+results = [
+  { name = "text", type = "string", required = true },
+  { name = "heard", type = "bool", required = true },
+  { name = "profile", type = "string", required = true },
+  { name = "language", type = "string", required = true },
+  { name = "seconds", type = "double", required = true },
+]

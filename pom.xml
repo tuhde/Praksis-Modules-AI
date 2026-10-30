@@ -21,6 +21,7 @@
 
   <modules>
     <module>praksis-module-ai</module>
+    <module>praksis-module-speech</module>
     <module>integration</module>
   </modules>
 </project>
