@@ -9,6 +9,7 @@ commands ask a language model, with the limits that make that safe to do with a 
 | `ai.classify` | which of the given labels fits a text best; the answer is checked against the list, so a rule can branch on it without trusting the model |
 | `ai.extract` | the values of named fields (date, amount, person) found in a text; a field that is not there is empty |
 | `ai.embed` | a vector for a text, for searching by meaning |
+| `ai.evaluate` | how well a profile does at a classification, on examples with known answers: the share it got right and the ones it got wrong; run it before a rule is allowed to move mail on a model's word |
 | `ai.calls` | the log of the model calls, newest first |
 
 All of them except `ai.calls` have the effect class `external`: they speak over the network, so a
@@ -78,6 +79,27 @@ profile = { one_of = ["local"] }
 A grant limits only the arguments it lists, and a call without one of them is not covered: a rule
 that is meant to use this grant must pass `profile` itself. The answers say where the text went
 (`data`), which `model` and what it cost (`tokens_in`, `tokens_out`).
+
+## Using it in a rule
+
+A rule asks and then branches on the answer with `when` on a step (a step whose condition is false is
+skipped, and later steps see its results as empty):
+
+```toml
+[[action]]
+id = "classify"
+capability = "ai.classify"
+args = { text = { cel = "event.data.subject" }, labels = ["invoice", "newsletter", "personal"], fallback = "", profile = "local" }
+
+[[action]]
+id = "move"
+capability = "mail.move"
+when = { cel = "results.classify.matched && results.classify.label == 'invoice'" }
+args = { message = { cel = "event.data.message" }, folder = "Invoices" }
+```
+
+[Praksis-Mail](https://github.com/tuhde/Praksis-Mail) has a complete rule (`mail.45-ai-sort`) and the
+command `mail.ai-evaluate` that tries a model on your own examples.
 
 ## Safety notes
 

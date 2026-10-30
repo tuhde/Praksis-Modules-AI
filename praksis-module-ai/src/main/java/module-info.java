@@ -14,5 +14,6 @@ module it.uhde.praksis.module.ai {
       it.uhde.praksis.module.ai.AiClassify,
       it.uhde.praksis.module.ai.AiComplete,
       it.uhde.praksis.module.ai.AiEmbed,
+      it.uhde.praksis.module.ai.AiEvaluate,
       it.uhde.praksis.module.ai.AiExtract;
 }

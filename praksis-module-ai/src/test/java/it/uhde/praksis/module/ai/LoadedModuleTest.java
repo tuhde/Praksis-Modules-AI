@@ -43,7 +43,8 @@ class LoadedModuleTest {
 
     try (LoadedModules loaded = ModuleLoader.load(modules, lock, Map.of())) {
       assertThat(loaded.capabilities())
-          .containsOnlyKeys("ai.calls", "ai.classify", "ai.complete", "ai.embed", "ai.extract");
+          .containsOnlyKeys(
+              "ai.calls", "ai.classify", "ai.complete", "ai.embed", "ai.evaluate", "ai.extract");
       assertThat(loaded.catalog().moduleNames()).containsExactly("ai");
       assertThat(loaded.catalog().capability("ai.classify").orElseThrow().effect().id())
           .isEqualTo("external");

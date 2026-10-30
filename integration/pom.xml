@@ -45,6 +45,8 @@
             <praksis.image>${praksis.core}/praksis-dist/target/praksis</praksis.image>
             <!-- the directory with the module directories, whose target directories hold the archives -->
             <praksis.modules>${project.basedir}/..</praksis.modules>
+            <!-- the ruleset that these tests run with the module, as it is published -->
+            <praksis.mail.ruleset>${project.basedir}/../../Praksis-Mail</praksis.mail.ruleset>
           </systemPropertyVariables>
         </configuration>
       </plugin>

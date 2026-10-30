@@ -195,16 +195,24 @@ final class Runner {
     }
   }
 
+  /** The budget of a day is used up: not an error of the server, and no use to try again today. */
+  static final class BudgetUsedUp extends CapabilityException {
+    private static final long serialVersionUID = 1L;
+
+    BudgetUsedUp(String message) {
+      super(message, false);
+    }
+  }
+
   private void budget(Profile profile) throws CapabilityException {
     if (profile.maxTokensPerDay() > 0
         && store.tokensToday(profile.name()) >= profile.maxTokensPerDay()) {
-      throw new CapabilityException(
+      throw new BudgetUsedUp(
           "the budget of profile '"
               + profile.name()
               + "' ("
               + profile.maxTokensPerDay()
-              + " tokens a day) is used up; it starts again at midnight UTC",
-          false);
+              + " tokens a day) is used up; it starts again at midnight UTC");
     }
   }
 

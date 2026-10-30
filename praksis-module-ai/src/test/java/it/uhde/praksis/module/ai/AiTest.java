@@ -531,4 +531,122 @@ class AiTest {
         .hasMessageContaining("no profile 'c'");
     assertThat(s.requests).isEmpty();
   }
+
+  private static Map<String, String> example(String text, String label) {
+    return Map.of("text", text, "label", label);
+  }
+
+  @Test
+  void anEvaluationScoresTheLabelsAgainstTheKnownAnswersAndListsTheMisses() throws Exception {
+    // the model gets the third wrong and answers off the list for the fourth
+    List<String> answers =
+        new ArrayList<>(
+            List.of(
+                "{\"label\":\"invoice\"}",
+                "{\"label\":\"personal\"}",
+                "{\"label\":\"newsletter\"}",
+                "{\"label\":\"cat pictures\"}"));
+    FakeModelServer s =
+        server()
+            .answering(
+                r ->
+                    r.path().equals("/api/tags")
+                        ? new FakeModelServer.Reply(200, "{\"models\":[]}")
+                        : new FakeModelServer.Reply(200, ollamaAnswer(answers.remove(0), 10, 2)));
+    AiEvaluate ai = make(new AiEvaluate(), settings("local", profile("ollama", s.url(), "local")));
+    AiCalls calls = make(new AiCalls(), Map.of());
+
+    Map<String, Object> result =
+        ai.invoke(
+            context(false),
+            Map.of(
+                "labels", List.of("invoice", "personal", "newsletter"),
+                "examples",
+                    List.of(
+                        example("Please pay 100 EUR", "invoice"),
+                        example("Are you coming on Sunday?", "personal"),
+                        example("Hi Till, birthday party on Saturday! Love, Anna", "personal"),
+                        example("Our autumn offer", "newsletter"))));
+
+    assertThat(result)
+        .containsEntry("correct", 2L)
+        .containsEntry("total", 4L)
+        .containsEntry("accuracy", 0.5)
+        .containsEntry("off_list", 1L)
+        .containsEntry("complete", true)
+        .containsEntry("tokens_in", 40L)
+        .containsEntry("data", "local");
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> misses = (List<Map<String, Object>>) result.get("misses");
+    assertThat(misses).hasSize(2);
+    assertThat(misses.get(0))
+        .containsEntry("expected", "personal")
+        .containsEntry("got", "newsletter")
+        .containsEntry("text", "Hi Till, birthday party on Saturday! Love, Anna");
+    assertThat(misses.get(1)).containsEntry("got", "(none of the labels)");
+    // every example was a logged call
+    @SuppressWarnings("unchecked")
+    List<Map<String, Object>> logged =
+        (List<Map<String, Object>>) calls.invoke(context(false), Map.of()).get("items");
+    assertThat(logged)
+        .hasSize(4)
+        .allSatisfy(c -> assertThat(c).containsEntry("capability", "ai.evaluate"));
+  }
+
+  @Test
+  void anEvaluationThatRunsOutOfBudgetScoresWhatItDidAndSaysItIsNotComplete() throws Exception {
+    FakeModelServer s =
+        server()
+            .answering(
+                r ->
+                    r.path().equals("/api/tags")
+                        ? new FakeModelServer.Reply(200, "{\"models\":[]}")
+                        : new FakeModelServer.Reply(
+                            200, ollamaAnswer("{\"label\":\"a\"}", 60, 50)));
+    AiEvaluate ai =
+        make(
+            new AiEvaluate(),
+            settings("local", profile("ollama", s.url(), "local", "max_tokens_per_day", 100)));
+
+    Map<String, Object> result =
+        ai.invoke(
+            context(false),
+            Map.of(
+                "labels", List.of("a", "b"),
+                "examples",
+                    List.of(example("one", "a"), example("two", "a"), example("three", "a"))));
+
+    assertThat(result)
+        .containsEntry("total", 1L)
+        .containsEntry("correct", 1L)
+        .containsEntry("complete", false);
+    assertThat(s.to("/api/chat")).hasSize(1);
+  }
+
+  @Test
+  void theExamplesAreCheckedBeforeAnythingIsSent() throws Exception {
+    FakeModelServer s = server();
+    AiEvaluate ai = make(new AiEvaluate(), settings("local", profile("ollama", s.url(), "local")));
+    List<String> labels = List.of("a", "b");
+
+    assertThatThrownBy(() -> ai.invoke(context(false), Map.of("labels", labels)))
+        .hasMessageContaining("'examples' is required");
+    assertThatThrownBy(
+            () ->
+                ai.invoke(
+                    context(false),
+                    Map.of("labels", labels, "examples", List.of(example("x", "c")))))
+        .hasMessageContaining("a 'label' that is one of the labels");
+    assertThatThrownBy(
+            () ->
+                ai.invoke(
+                    context(false),
+                    Map.of(
+                        "labels",
+                        labels,
+                        "examples",
+                        java.util.Collections.nCopies(201, example("x", "a")))))
+        .hasMessageContaining("at most 200");
+    assertThat(s.requests).isEmpty();
+  }
 }

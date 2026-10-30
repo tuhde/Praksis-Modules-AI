@@ -89,6 +89,33 @@ results = [
   { name = "tokens_out", type = "int", required = true },
 ]
 
+# How good a profile is at a classification, on examples with known answers: the share that got
+# the label they were given, and the ones that did not. Every example is a call of ai.classify, so
+# it counts against the budget and is logged.
+[[capability]]
+name = "ai.evaluate"
+effect = "external"
+dry_run = true
+params = [
+  { name = "examples", type = "list", required = true, scopable = false },
+  { name = "labels", type = "list", required = true, scopable = false },
+  { name = "instructions", type = "string", required = false, scopable = false },
+  { name = "profile", type = "string", required = false, scopable = true },
+]
+results = [
+  { name = "accuracy", type = "double", required = true },
+  { name = "correct", type = "int", required = true },
+  { name = "total", type = "int", required = true },
+  { name = "off_list", type = "int", required = true },
+  { name = "complete", type = "bool", required = true },
+  { name = "misses", type = "list", required = true },
+  { name = "profile", type = "string", required = true },
+  { name = "model", type = "string", required = true },
+  { name = "data", type = "string", required = true },
+  { name = "tokens_in", type = "int", required = true },
+  { name = "tokens_out", type = "int", required = true },
+]
+
 # The log of the calls. What was sent and what came back is in it only with content = true.
 [[capability]]
 name = "ai.calls"
