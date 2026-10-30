@@ -1,0 +1,102 @@
+format_version = 1
+api_version = 1
+name = "ai"
+version = "0.1.0"
+module = "it.uhde.praksis.module.ai"
+jdk_modules = ["java.net.http", "java.sql", "org.xerial.sqlitejdbc", "com.fasterxml.jackson.databind"]
+
+# Asking a model. The profile (a model server and model that the person set up in praksis.toml, with
+# where the text goes: this machine or not) can be limited by a grant, so that a mail may go to the
+# local model and not to a cloud one. All four ask over the network, so they are 'external'. The
+# answers say where the text went (data), which model, and what it cost.
+
+[[capability]]
+name = "ai.complete"
+effect = "external"
+dry_run = true
+params = [
+  { name = "prompt", type = "string", required = true, scopable = false },
+  { name = "text", type = "string", required = false, scopable = false },
+  { name = "system", type = "string", required = false, scopable = false },
+  { name = "profile", type = "string", required = false, scopable = true },
+  { name = "max_tokens", type = "int", required = false, scopable = false },
+]
+results = [
+  { name = "text", type = "string", required = true },
+  { name = "profile", type = "string", required = true },
+  { name = "model", type = "string", required = true },
+  { name = "data", type = "string", required = true },
+  { name = "tokens_in", type = "int", required = true },
+  { name = "tokens_out", type = "int", required = true },
+]
+
+[[capability]]
+name = "ai.classify"
+effect = "external"
+dry_run = true
+params = [
+  { name = "text", type = "string", required = true, scopable = false },
+  { name = "labels", type = "list", required = true, scopable = false },
+  { name = "instructions", type = "string", required = false, scopable = false },
+  { name = "fallback", type = "string", required = false, scopable = false },
+  { name = "profile", type = "string", required = false, scopable = true },
+]
+results = [
+  { name = "label", type = "string", required = true },
+  { name = "matched", type = "bool", required = true },
+  { name = "profile", type = "string", required = true },
+  { name = "model", type = "string", required = true },
+  { name = "data", type = "string", required = true },
+  { name = "tokens_in", type = "int", required = true },
+  { name = "tokens_out", type = "int", required = true },
+]
+
+[[capability]]
+name = "ai.extract"
+effect = "external"
+dry_run = true
+params = [
+  { name = "text", type = "string", required = true, scopable = false },
+  { name = "fields", type = "list", required = true, scopable = false },
+  { name = "instructions", type = "string", required = false, scopable = false },
+  { name = "profile", type = "string", required = false, scopable = true },
+]
+results = [
+  { name = "values", type = "map", required = true },
+  { name = "found", type = "int", required = true },
+  { name = "profile", type = "string", required = true },
+  { name = "model", type = "string", required = true },
+  { name = "data", type = "string", required = true },
+  { name = "tokens_in", type = "int", required = true },
+  { name = "tokens_out", type = "int", required = true },
+]
+
+[[capability]]
+name = "ai.embed"
+effect = "external"
+dry_run = true
+params = [
+  { name = "text", type = "string", required = true, scopable = false },
+  { name = "profile", type = "string", required = false, scopable = true },
+]
+results = [
+  { name = "vector", type = "list", required = true },
+  { name = "dimensions", type = "int", required = true },
+  { name = "profile", type = "string", required = true },
+  { name = "model", type = "string", required = true },
+  { name = "data", type = "string", required = true },
+  { name = "tokens_in", type = "int", required = true },
+  { name = "tokens_out", type = "int", required = true },
+]
+
+# The log of the calls. What was sent and what came back is in it only with content = true.
+[[capability]]
+name = "ai.calls"
+effect = "read-only"
+dry_run = true
+params = [
+  { name = "limit", type = "int", required = false, scopable = false },
+  { name = "profile", type = "string", required = false, scopable = true },
+  { name = "content", type = "bool", required = false, scopable = false },
+]
+results = [{ name = "items", type = "list", required = true }]

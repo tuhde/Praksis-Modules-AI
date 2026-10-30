@@ -1,0 +1,7 @@
+Praksis-Modules-AI
+Copyright 2026 Till Uhde
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The module archive contains no third-party jar files: JSON (Jackson), the SQLite driver and the HTTP
+client are provided by the runtime image of Praksis, whose NOTICE lists them.
