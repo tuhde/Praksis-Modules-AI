@@ -36,6 +36,7 @@ enabled_modules = ["maildir", "ai"]
 [module.ai]
 default = "local"            # used when a call names no profile
 # retention_days = 14        # the log of calls is kept this long
+# offline = false            # true: profiles with data = "cloud" are refused, nothing leaves this machine
 # log_content = true         # false: the log keeps only hashes of what was sent and came back
 
 [module.ai.local]

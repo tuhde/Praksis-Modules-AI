@@ -69,13 +69,15 @@ record Profile(
       Map<String, Profile> profiles,
       String defaultProfile,
       int retentionDays,
-      boolean logContent) {}
+      boolean logContent,
+      boolean offline) {}
 
   static Settings parse(Map<String, Object> settings) throws CapabilityException {
     Map<String, Profile> profiles = new LinkedHashMap<>();
     String defaultName = null;
     int retention = 14;
     boolean logContent = true;
+    boolean offline = false;
     for (var e : settings.entrySet()) {
       switch (e.getKey()) {
         case "default" -> defaultName = text(e.getValue(), "default");
@@ -85,6 +87,12 @@ record Profile(
             throw bad("'log_content' must be true or false");
           }
           logContent = b;
+        }
+        case "offline" -> {
+          if (!(e.getValue() instanceof Boolean b)) {
+            throw bad("'offline' must be true or false");
+          }
+          offline = b;
         }
         default -> {
           if (!(e.getValue() instanceof Map<?, ?> table)) {
@@ -100,7 +108,7 @@ record Profile(
     if (defaultName != null && !profiles.containsKey(defaultName)) {
       throw bad("'default' names the profile '" + defaultName + "', which is not set up");
     }
-    return new Settings(Map.copyOf(profiles), defaultName, retention, logContent);
+    return new Settings(Map.copyOf(profiles), defaultName, retention, logContent, offline);
   }
 
   private static Profile profile(String name, Map<?, ?> table) throws CapabilityException {

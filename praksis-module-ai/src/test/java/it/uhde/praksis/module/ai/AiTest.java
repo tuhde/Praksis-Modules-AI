@@ -375,6 +375,32 @@ class AiTest {
   }
 
   @Test
+  void offlineModeRefusesEveryCloudProfileBeforeAnythingIsSentAndKeepsTheLocalOnes()
+      throws Exception {
+    FakeModelServer s =
+        server().answering(r -> new FakeModelServer.Reply(200, ollamaAnswer("ok", 1, 1)));
+    Map<String, Object> both = new LinkedHashMap<>();
+    both.put("cloud", profile("ollama", s.url(), "cloud"));
+    both.put("local", profile("ollama", s.url(), "local"));
+    both.put("offline", true);
+    AiComplete ai = make(new AiComplete(), both);
+
+    assertThatThrownBy(
+            () ->
+                ai.invoke(
+                    context(false), Map.of("prompt", "x", "text", "mail", "profile", "cloud")))
+        .hasMessageContaining("offline = true")
+        .hasMessageContaining("'cloud'");
+    assertThat(s.to("/api/chat")).isEmpty();
+    Map<String, Object> done = ai.invoke(context(false), Map.of("prompt", "x", "profile", "local"));
+    assertThat(done).containsEntry("data", "local");
+    assertThat((String) done.get("prompt_sha256")).matches("[0-9a-f]{64}");
+
+    both.put("offline", "yes");
+    assertThatThrownBy(() -> make(new AiComplete(), both)).hasMessageContaining("'offline'");
+  }
+
+  @Test
   void aDryRunAsksNobodyAndLogsNothing() throws Exception {
     FakeModelServer s = server();
     AiClassify ai = make(new AiClassify(), settings("local", profile("ollama", s.url(), "local")));

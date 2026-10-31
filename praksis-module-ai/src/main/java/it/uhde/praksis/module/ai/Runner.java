@@ -46,7 +46,11 @@ final class Runner {
   }
 
   /** What a call gives back, besides the answer. */
-  record Done(ModelApi.Reply reply, Profile profile) {
+  record Done(ModelApi.Reply reply, Profile profile, String prompt) {
+    Done(ModelApi.Reply reply, Profile profile) {
+      this(reply, profile, "");
+    }
+
     Map<String, Object> facts() {
       Map<String, Object> m = new LinkedHashMap<>();
       m.put("profile", profile.name());
@@ -54,6 +58,10 @@ final class Runner {
       m.put("data", profile.data().id());
       m.put("tokens_in", reply.tokensIn());
       m.put("tokens_out", reply.tokensOut());
+      if (!prompt.isEmpty()) {
+        // with the model, the profile and this, a change that a model made can be asked for again
+        m.put("prompt_sha256", Store.sha256(prompt));
+      }
       return m;
     }
   }
@@ -112,7 +120,10 @@ final class Runner {
           ModelApi.Reply reply =
               ModelApi.of(profile.api()).chat(profile, key(profile), system, user, schema, tokens);
           return new Answer<>(
-              new Done(reply, profile), reply.tokensIn(), reply.tokensOut(), reply.text());
+              new Done(reply, profile, system + "\n" + user),
+              reply.tokensIn(),
+              reply.tokensOut(),
+              reply.text());
         });
   }
 
@@ -183,6 +194,14 @@ final class Runner {
   }
 
   private void checkInput(Profile profile, int length) throws CapabilityException {
+    if (settings.offline() && profile.data() == Profile.Data.CLOUD) {
+      throw new CapabilityException(
+          "offline = true: profile '"
+              + profile.name()
+              + "' sends text to another machine and is not used; use a profile with data ="
+              + " \"local\" or set offline to false",
+          false);
+    }
     if (length > profile.maxInputChars()) {
       throw new CapabilityException(
           "the text is "

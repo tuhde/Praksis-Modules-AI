@@ -28,6 +28,7 @@ results = [
   { name = "data", type = "string", required = true },
   { name = "tokens_in", type = "int", required = true },
   { name = "tokens_out", type = "int", required = true },
+  { name = "prompt_sha256", type = "string", required = false },
 ]
 
 [[capability]]
@@ -49,6 +50,7 @@ results = [
   { name = "data", type = "string", required = true },
   { name = "tokens_in", type = "int", required = true },
   { name = "tokens_out", type = "int", required = true },
+  { name = "prompt_sha256", type = "string", required = false },
 ]
 
 [[capability]]
@@ -69,6 +71,7 @@ results = [
   { name = "data", type = "string", required = true },
   { name = "tokens_in", type = "int", required = true },
   { name = "tokens_out", type = "int", required = true },
+  { name = "prompt_sha256", type = "string", required = false },
 ]
 
 [[capability]]

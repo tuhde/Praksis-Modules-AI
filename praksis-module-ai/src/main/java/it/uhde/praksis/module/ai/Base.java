@@ -12,7 +12,7 @@ import java.util.Map;
  * directory.
  */
 abstract class Base implements Capability {
-  private Profile.Settings settings = new Profile.Settings(Map.of(), null, 14, true);
+  private Profile.Settings settings = new Profile.Settings(Map.of(), null, 14, true, false);
   private Credentials credentials;
   private Path directory;
   private Store store;
