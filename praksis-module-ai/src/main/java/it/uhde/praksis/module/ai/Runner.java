@@ -115,10 +115,39 @@ final class Runner {
     return call(
         capability,
         profile,
+        system,
         system + "\n" + user,
         () -> {
           ModelApi.Reply reply =
               ModelApi.of(profile.api()).chat(profile, key(profile), system, user, schema, tokens);
+          return new Answer<>(
+              new Done(reply, profile, system + "\n" + user),
+              reply.tokensIn(),
+              reply.tokensOut(),
+              reply.text());
+        });
+  }
+
+  /**
+   * Sends a logged prompt again, exactly as it was (the same system message, the same user message
+   * with the same markers), to a profile that may be another one.
+   */
+  Done resend(CapabilityContext context, Profile profile, String system, String user, int maxTokens)
+      throws CapabilityException {
+    int tokens =
+        Math.min(maxTokens <= 0 ? profile.maxOutputTokens() : maxTokens, profile.maxOutputTokens());
+    checkInput(profile, system.length() + user.length());
+    if (context.dryRun()) {
+      return new Done(new ModelApi.Reply("", 0, 0), profile);
+    }
+    return call(
+        "ai.replay",
+        profile,
+        system,
+        system + "\n" + user,
+        () -> {
+          ModelApi.Reply reply =
+              ModelApi.of(profile.api()).chat(profile, key(profile), system, user, null, tokens);
           return new Answer<>(
               new Done(reply, profile, system + "\n" + user),
               reply.tokensIn(),
@@ -164,6 +193,11 @@ final class Runner {
 
   private <T> T call(String capability, Profile profile, String sent, Ask<T> ask)
       throws CapabilityException {
+    return call(capability, profile, "", sent, ask);
+  }
+
+  private <T> T call(String capability, Profile profile, String system, String sent, Ask<T> ask)
+      throws CapabilityException {
     budget(profile);
     forwarding(profile);
     long started = System.nanoTime();
@@ -187,7 +221,8 @@ final class Runner {
               (System.nanoTime() - started) / 1_000_000,
               outcome.length() > 300 ? outcome.substring(0, 300) : outcome,
               sent,
-              answer == null ? "" : answer.text()),
+              answer == null ? "" : answer.text(),
+              system),
           settings.logContent(),
           settings.retentionDays());
     }

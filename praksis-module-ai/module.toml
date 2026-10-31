@@ -130,3 +130,26 @@ params = [
   { name = "content", type = "bool", required = false, scopable = false },
 ]
 results = [{ name = "items", type = "list", required = true }]
+
+# Sends a logged ai.complete call again, exactly as it was, to the same or another profile, and says
+# whether the answer is the same. It needs content in the log (log_content = true).
+[[capability]]
+name = "ai.replay"
+effect = "external"
+dry_run = true
+params = [
+  { name = "id", type = "int", required = true, scopable = false },
+  { name = "profile", type = "string", required = false, scopable = true },
+]
+results = [
+  { name = "again", type = "string", required = true },
+  { name = "original", type = "string", required = true },
+  { name = "same", type = "bool", required = true },
+  { name = "original_model", type = "string", required = true },
+  { name = "profile", type = "string", required = true },
+  { name = "model", type = "string", required = true },
+  { name = "data", type = "string", required = true },
+  { name = "tokens_in", type = "int", required = true },
+  { name = "tokens_out", type = "int", required = true },
+  { name = "prompt_sha256", type = "string", required = false },
+]

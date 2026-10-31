@@ -11,7 +11,8 @@ speech into text with a Vosk on this machine (see the end).
 | `ai.extract` | the values of named fields (date, amount, person) found in a text; a field that is not there is empty |
 | `ai.embed` | a vector for a text, for searching by meaning |
 | `ai.evaluate` | how well a profile does at a classification, on examples with known answers: the share it got right and the ones it got wrong; run it before a rule is allowed to move mail on a model's word |
-| `ai.calls` | the log of the model calls, newest first |
+| `ai.calls` | the log of the model calls, newest first (each has an `id`) |
+| `ai.replay` | sends a logged `ai.complete` call again, exactly as it was, to the same or another profile, and says whether the answer is the same (needs `log_content = true`) |
 
 All of them except `ai.calls` have the effect class `external`: they speak over the network, so a
 rule that uses them needs a person's approval like any rule that sends something out.

@@ -30,7 +30,7 @@ import java.util.Map;
  */
 final class Store {
   private static final Map<Path, Store> OPEN = new HashMap<>();
-  private static final int SCHEMA = 1;
+  private static final int SCHEMA = 2;
 
   private final Path file;
   private final Connection db;
@@ -76,10 +76,14 @@ final class Store {
                 + " capability TEXT NOT NULL, profile TEXT NOT NULL, model TEXT NOT NULL,"
                 + " data TEXT NOT NULL, tokens_in INTEGER NOT NULL, tokens_out INTEGER NOT NULL,"
                 + " millis INTEGER NOT NULL, outcome TEXT NOT NULL, prompt TEXT NOT NULL,"
-                + " response TEXT NOT NULL)");
+                + " response TEXT NOT NULL, system TEXT NOT NULL DEFAULT '')");
         s.execute(
             "CREATE TABLE IF NOT EXISTS usage (day TEXT NOT NULL, profile TEXT NOT NULL,"
                 + " tokens INTEGER NOT NULL, PRIMARY KEY (day, profile))");
+        s.execute("PRAGMA user_version = " + SCHEMA);
+      } else if (version == 1) {
+        // the system message is kept apart from the rest, so that a call can be sent again
+        s.execute("ALTER TABLE call ADD COLUMN system TEXT NOT NULL DEFAULT ''");
         s.execute("PRAGMA user_version = " + SCHEMA);
       } else if (version != SCHEMA) {
         throw new SQLException("the log was written by another version of the module");
@@ -99,14 +103,49 @@ final class Store {
       long millis,
       String outcome,
       String prompt,
+      String response,
+      String system) {}
+
+  /** A logged call with what it takes to send it again. */
+  record Stored(
+      long id,
+      String capability,
+      String profile,
+      String model,
+      String system,
+      String prompt,
       String response) {}
+
+  synchronized java.util.Optional<Stored> find(long id) throws CapabilityException {
+    try (PreparedStatement p =
+        db.prepareStatement(
+            "SELECT id, capability, profile, model, system, prompt, response FROM call WHERE id = ?")) {
+      p.setLong(1, id);
+      try (ResultSet r = p.executeQuery()) {
+        return r.next()
+            ? java.util.Optional.of(
+                new Stored(
+                    r.getLong(1),
+                    r.getString(2),
+                    r.getString(3),
+                    r.getString(4),
+                    r.getString(5),
+                    r.getString(6),
+                    r.getString(7)))
+            : java.util.Optional.empty();
+      }
+    } catch (SQLException e) {
+      throw new CapabilityException(
+          "cannot read the log of model calls: " + e.getMessage(), true, e);
+    }
+  }
 
   synchronized void record(Call call, boolean content, int retentionDays)
       throws CapabilityException {
     try (PreparedStatement p =
         db.prepareStatement(
             "INSERT INTO call (at, capability, profile, model, data, tokens_in, tokens_out, millis,"
-                + " outcome, prompt, response) VALUES (?,?,?,?,?,?,?,?,?,?,?)")) {
+                + " outcome, prompt, response, system) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")) {
       p.setString(1, Instant.now().toString());
       p.setString(2, call.capability());
       p.setString(3, call.profile());
@@ -118,6 +157,7 @@ final class Store {
       p.setString(9, call.outcome());
       p.setString(10, content ? call.prompt() : "sha256:" + sha256(call.prompt()));
       p.setString(11, content ? call.response() : "sha256:" + sha256(call.response()));
+      p.setString(12, content ? call.system() : "");
       p.executeUpdate();
       if (call.tokensIn() + call.tokensOut() > 0) {
         try (PreparedStatement u =
@@ -155,7 +195,7 @@ final class Store {
   synchronized List<Map<String, Object>> calls(int limit, String profile, boolean content)
       throws CapabilityException {
     String sql =
-        "SELECT at, capability, profile, model, data, tokens_in, tokens_out, millis, outcome,"
+        "SELECT id, at, capability, profile, model, data, tokens_in, tokens_out, millis, outcome,"
             + " prompt, response FROM call "
             + (profile == null ? "" : "WHERE profile = ? ")
             + "ORDER BY id DESC LIMIT ?";
@@ -169,18 +209,19 @@ final class Store {
       try (ResultSet r = p.executeQuery()) {
         while (r.next()) {
           Map<String, Object> row = new LinkedHashMap<>();
-          row.put("at", r.getString(1));
-          row.put("capability", r.getString(2));
-          row.put("profile", r.getString(3));
-          row.put("model", r.getString(4));
-          row.put("data", r.getString(5));
-          row.put("tokens_in", r.getLong(6));
-          row.put("tokens_out", r.getLong(7));
-          row.put("millis", r.getLong(8));
-          row.put("outcome", r.getString(9));
+          row.put("id", r.getLong(1));
+          row.put("at", r.getString(2));
+          row.put("capability", r.getString(3));
+          row.put("profile", r.getString(4));
+          row.put("model", r.getString(5));
+          row.put("data", r.getString(6));
+          row.put("tokens_in", r.getLong(7));
+          row.put("tokens_out", r.getLong(8));
+          row.put("millis", r.getLong(9));
+          row.put("outcome", r.getString(10));
           if (content) {
-            row.put("prompt", r.getString(10));
-            row.put("response", r.getString(11));
+            row.put("prompt", r.getString(11));
+            row.put("response", r.getString(12));
           }
           out.add(row);
         }

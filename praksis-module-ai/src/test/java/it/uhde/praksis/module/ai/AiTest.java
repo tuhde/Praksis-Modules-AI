@@ -401,6 +401,105 @@ class AiTest {
   }
 
   @Test
+  void aLoggedCallIsSentAgainExactlyAndTheAnswersAreCompared() throws Exception {
+    java.util.concurrent.atomic.AtomicInteger n = new java.util.concurrent.atomic.AtomicInteger();
+    FakeModelServer s =
+        server()
+            .answering(
+                r ->
+                    new FakeModelServer.Reply(
+                        200, ollamaAnswer("answer " + n.incrementAndGet(), 1, 1)));
+    Map<String, Object> both = new LinkedHashMap<>();
+    both.put("a", profile("ollama", s.url(), "local"));
+    both.put("b", profile("ollama", s.url(), "local", "model", "m2"));
+    AiComplete ai = make(new AiComplete(), both);
+    AiCalls calls = make(new AiCalls(), both);
+    AiReplay replay = make(new AiReplay(), both);
+    Object first =
+        ai.invoke(
+                context(false),
+                Map.of(
+                    "prompt",
+                    "Summarise.",
+                    "text",
+                    "mail text",
+                    "system",
+                    "Be short.",
+                    "profile",
+                    "a"))
+            .get("text");
+    Object id =
+        ((Map<?, ?>) ((List<?>) calls.invoke(context(false), Map.of()).get("items")).get(0))
+            .get("id");
+
+    Map<String, Object> result =
+        replay.invoke(context(false), Map.of("id", ((Number) id).intValue(), "profile", "b"));
+
+    assertThat(result)
+        .containsEntry("original", first)
+        .containsEntry("same", false)
+        .containsEntry("original_model", "m1")
+        .containsEntry("model", "m2");
+    // what went out is the same, byte for byte, except for the model
+    var sent = s.to("/api/chat");
+    var firstBody = sent.get(0).body();
+    var secondBody = sent.get(sent.size() - 1).body();
+    assertThat(secondBody.path("messages")).isEqualTo(firstBody.path("messages"));
+    assertThat(result.get("again")).isNotEqualTo(first);
+    assertThat(firstBody.path("messages").get(0).path("content").asText()).startsWith("Be short.");
+
+    assertThatThrownBy(() -> replay.invoke(context(false), Map.of("id", 9999)))
+        .hasMessageContaining("no logged call");
+    assertThatThrownBy(() -> replay.invoke(context(false), Map.of()))
+        .hasMessageContaining("'id' is required");
+  }
+
+  @Test
+  void aCallWhoseTextWasNotKeptCannotBeSentAgain() throws Exception {
+    FakeModelServer s =
+        server().answering(r -> new FakeModelServer.Reply(200, ollamaAnswer("ok", 1, 1)));
+    Map<String, Object> st =
+        settings("a", profile("ollama", s.url(), "local"), "log_content", false);
+    AiComplete ai = make(new AiComplete(), st);
+    AiCalls calls = make(new AiCalls(), st);
+    AiReplay replay = make(new AiReplay(), st);
+    ai.invoke(context(false), Map.of("prompt", "x", "text", "secret"));
+    Object id =
+        ((Map<?, ?>) ((List<?>) calls.invoke(context(false), Map.of()).get("items")).get(0))
+            .get("id");
+
+    assertThatThrownBy(() -> replay.invoke(context(false), Map.of("id", ((Number) id).intValue())))
+        .hasMessageContaining("log_content = false");
+    assertThat(s.to("/api/chat")).hasSize(1);
+  }
+
+  @Test
+  void aLogOfTheFirstVersionIsKeptAndGainsTheColumnForTheSystemMessage() throws Exception {
+    try (java.sql.Connection db =
+            java.sql.DriverManager.getConnection("jdbc:sqlite:" + data.resolve("ai.db"));
+        java.sql.Statement st = db.createStatement()) {
+      st.execute(
+          "CREATE TABLE call (id INTEGER PRIMARY KEY, at TEXT NOT NULL, capability TEXT NOT NULL,"
+              + " profile TEXT NOT NULL, model TEXT NOT NULL, data TEXT NOT NULL, tokens_in INTEGER"
+              + " NOT NULL, tokens_out INTEGER NOT NULL, millis INTEGER NOT NULL, outcome TEXT NOT"
+              + " NULL, prompt TEXT NOT NULL, response TEXT NOT NULL)");
+      st.execute(
+          "CREATE TABLE usage (day TEXT NOT NULL, profile TEXT NOT NULL, tokens INTEGER NOT NULL,"
+              + " PRIMARY KEY (day, profile))");
+      st.execute(
+          "INSERT INTO call VALUES (1, '2026-10-01T00:00:00Z', 'ai.complete', 'a', 'm1', 'local',"
+              + " 1, 1, 1, 'ok', 'old prompt', 'old answer')");
+      st.execute("PRAGMA user_version = 1");
+    }
+    FakeModelServer s = server();
+    AiCalls calls = make(new AiCalls(), settings("a", profile("ollama", s.url(), "local")));
+
+    assertThat(calls.invoke(context(false), Map.of("content", true)).get("items").toString())
+        .contains("old prompt")
+        .contains("id=1");
+  }
+
+  @Test
   void aDryRunAsksNobodyAndLogsNothing() throws Exception {
     FakeModelServer s = server();
     AiClassify ai = make(new AiClassify(), settings("local", profile("ollama", s.url(), "local")));
