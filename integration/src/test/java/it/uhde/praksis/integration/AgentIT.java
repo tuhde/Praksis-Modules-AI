@@ -4,6 +4,8 @@ package it.uhde.praksis.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import it.uhde.praksis.protocol.Request;
+import it.uhde.praksis.protocol.Response;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -421,6 +423,92 @@ class AgentIT {
           .contains("It was moved to the folder Demo by the rule mail.50-demo.")
           .contains("What I looked at")
           .contains("for event ");
+      h.stop(daemon);
+    }
+  }
+
+  @Test
+  void aRequestBecomesAPlanThatNothingRunsUntilAPersonApprovesAndNoStepGoesBeyondTheGrants()
+      throws Exception {
+    java.util.List<String> asked = new java.util.concurrent.CopyOnWriteArrayList<>();
+    java.util.concurrent.atomic.AtomicReference<String> message =
+        new java.util.concurrent.atomic.AtomicReference<>("");
+    try (FakeModelServer models =
+            new FakeModelServer()
+                .answering(
+                    r -> {
+                      if (r.path().equals("/api/tags")) {
+                        return new FakeModelServer.Reply(200, "{\"models\":[]}");
+                      }
+                      asked.add(r.body().path("messages").get(1).path("content").asText());
+                      // first the model is asked what to look at, then for the steps
+                      return asked.size() == 1
+                          ? say("[]")
+                          : say(
+                              "Here: ```json\n[{\"capability\":\"mail.move\",\"args\":{\"message\":\""
+                                  + message.get()
+                                  + "\",\"folder\":\"Reading\"}}]\n```");
+                    });
+        Harness h = new Harness()) {
+      setUp(h, models);
+      Path mail = h.mail.resolve("cur/1.news:2,");
+      message.set(mail.toString());
+      Files.writeString(mail, "From: n@example.org\nSubject: Weekly\n\nbody\n");
+      Files.writeString(
+          h.home.resolve("praksis.toml"),
+          Files.readString(h.home.resolve("praksis.toml")) + "\n[plan]\nlayer = \"mine\"\n");
+      Files.writeString(
+          h.home.resolve("policy.toml"),
+          Files.readString(h.home.resolve("policy.toml"))
+              + """
+
+              [[grant]]
+              id = "plan-catalog"
+              layer = "agent"
+              capability = "praksis.plan.catalog"
+              [[grant]]
+              id = "plan-read"
+              layer = "agent"
+              capability = "praksis.plan.read"
+              [[grant]]
+              id = "plan-propose"
+              layer = "agent"
+              capability = "praksis.plan.propose"
+              [[grant]]
+              id = "reading-move"
+              layer = "mine"
+              capability = "mail.move"
+              [grant.args]
+              folder = { one_of = ["Reading"] }
+              """);
+      Process daemon = h.startDaemon();
+
+      Harness.CliResult made = h.cli("run", "agent.plan", "request=move the newsletter to Reading");
+      assertThat(made.exit()).as(made.output()).isZero();
+
+      // the model saw what the plan layer may do, and nothing of the daemon's own capabilities
+      assertThat(asked).hasSize(2);
+      assertThat(asked.get(0))
+          .contains("mail.move [local-write]")
+          .contains("one_of")
+          .doesNotContain("praksis.agent.propose")
+          .doesNotContain("praksis.notes");
+      // nothing has moved
+      assertThat(h.names("cur")).contains("1.news:2,");
+      Response.PlanList plans = (Response.PlanList) h.ask(new Request.AgentPlans());
+      assertThat(plans.items()).hasSize(1);
+      Response.Plan plan = plans.items().get(0);
+      assertThat(plan.status()).isEqualTo("PROPOSED");
+      assertThat(plan.layer()).isEqualTo("mine");
+      assertThat(plan.steps()).hasSize(1);
+      assertThat(plan.steps().get(0).capability()).isEqualTo("mail.move");
+      assertThat(plan.steps().get(0).allowed()).isTrue();
+
+      // a person approves: the step runs under the grants of layer mine
+      Response.PlanDetail ran = (Response.PlanDetail) h.ask(new Request.AgentPlanRun(plan.id()));
+      assertThat(ran.plan().status()).isEqualTo("DONE");
+      assertThat(h.names(".Reading/cur")).hasSize(1);
+      assertThat(h.cli("audit", "-n", "100").output()).contains("plan.approved");
       h.stop(daemon);
     }
   }
