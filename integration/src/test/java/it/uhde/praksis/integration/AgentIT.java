@@ -503,6 +503,11 @@ class AgentIT {
       assertThat(plan.steps()).hasSize(1);
       assertThat(plan.steps().get(0).capability()).isEqualTo("mail.move");
       assertThat(plan.steps().get(0).allowed()).isTrue();
+      // "Reading" was in the request; the path of the mail was neither written nor read
+      assertThat(plan.steps().get(0).warning())
+          .contains("not in your request")
+          .contains("message =")
+          .doesNotContain("folder");
 
       // a person approves: the step runs under the grants of layer mine
       Response.PlanDetail ran = (Response.PlanDetail) h.ask(new Request.AgentPlanRun(plan.id()));
